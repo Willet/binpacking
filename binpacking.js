@@ -23,6 +23,19 @@
                 bottom: (input.top + input.height) || input.bottom,
                 right: (input.left + input.width) || input.right
             };
+        },
+        closestNum: function (target) {
+            // target, [numbers, ...]. returns the number closest to target.
+            var nums = {},
+                diff = Infinity,
+                diffs = [],
+                i = 1;
+            for (i = 1; i < arguments.length; i++) {
+                diff = Math.abs(target - arguments[i]);
+                diffs.push(diff);
+                nums[diff] = arguments[i];
+            }
+            return nums[Math.min.apply(this, diffs)];
         }
     };
 
@@ -30,16 +43,23 @@
         var $host = this,
             hostCoords = utils.getCoords($host),
 
-            settings = $.extend({  // defaults
-                target: '.bin'
-            }, params),
+            settings = $.extend(
+                {},
+                {  // defaults
+                    target: '.bin',
+                    forceWidthMultiplier: true,
+                    columns: 1,
+                    columnWidth: 1  // 100%
+                },
+                params),
 
             collectCoords = function ($host) {
                 // get list of (coords of each content).
-                var $vectors = $(settings.target, $host),
+                // you should only trust their width/height values.
+                var $blocks = $(settings.target, $host),
                     lstVectors = [];  // container
 
-                $.each($vectors, function (idx, obj) {
+                $.each($blocks, function (idx, obj) {
                     var $obj = $(obj),
                         coords = utils.getCoords();
                     coords.element = $obj;  // keep it
@@ -49,9 +69,11 @@
             },
 
             layoutContents = function () {
-                var $vectors = $(settings.target, $host);  // container
+                var $blocks = $(settings.target, $host),  // blocks
+                    minRowHeight = 0,
+                    columnCounter = 0;
 
-                $vectors.each(function (idx, block) {
+                $blocks.each(function (idx, block) {
                     var $block = $(block),
                         blockCoords = utils.getCoords($block),
                         $prevBlock,
@@ -61,23 +83,35 @@
                     if (idx === 0) {  // if this is not the first block, which
                                     // should always be on the top left anyway
                         $block.css({'left': 0, 'top': 0});
+                        minRowHeight = blockCoords.height;
                         return;
                     }
 
                     // else (not the first block)
-                    $prevBlock = $($vectors[idx - 1]);
+                    $prevBlock = $($blocks[idx - 1]);
                     prevBlockCoords = utils.getCoords($prevBlock);
+                    minRowHeight = Math.min(minRowHeight, prevBlockCoords.height);
 
-                    var proposedCoords = {};
+                    var newCoords = {};
                     if (prevBlockCoords.right + blockCoords.width <= hostCoords.right) {
-                        proposedCoords.top = prevBlockCoords.top;
-                        proposedCoords.left = prevBlockCoords.right;
+                        newCoords.top = prevBlockCoords.top;
+                        newCoords.left = prevBlockCoords.right;
                     } else {
-                        proposedCoords.top = prevBlockCoords.bottom;
-                        proposedCoords.left = 0;
+                        newCoords.top = minRowHeight;
+                        newCoords.left = 0;
                     }
 
-                    $block.css(proposedCoords);
+                    $block.css(newCoords);
+
+                    // raise it by one and loop back to first column if needed
+                    columnCounter++;
+                    if (columnCounter >= settings.columns) {
+                        columnCounter = 0;
+                        minRowHeight  = Math.min.apply(this, []);
+                        if ($blocks[idx + 1]) {
+                            $($blocks[idx + 1]).css('left', 0);
+                        }
+                    }
                 });
             };
 
@@ -89,4 +123,6 @@
 
         return $host.each(layoutContents);  // chaining
     };
+
+    window.utils = utils;
 }(jQuery));

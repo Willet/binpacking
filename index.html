@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title></title>
+    <style type="text/css">
+        .block {
+            background-color: #eef;
+            /* margin: 10px 15px 5px 20px;
+            padding: 10px 15px 5px 20px; */
+            border: 1px solid silver;
+            outline: 1px solid black;
+            width: 200px;
+            height: 200px;
+            opacity: 0.6;
+            box-shadow: 0 1px 3px 2px #999;
+        }
+    </style>
+    <script type="text/javascript" src="//ajax.googleapis.com/ajax/libs/jquery/1.10.1/jquery.min.js"></script>
+    <script type="text/javascript" src="binpacking.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $('.block', '#container').each(function (i, o) {
+                $(o).css({
+                    'width': 100 + Math.random() * 300,
+                    'height': 100 + Math.random() * 300
+                });
+            });
+
+            $('#container').binpack({
+                'target': '.block',
+                'bindResize': true
+            });
+        });
+    </script>
+</head>
+<body>
+    <div id="container">
+        <div class="block"></div>
+        <div class="block"></div>
+        <div class="block"></div>
+        <div class="block"></div>
+        <div class="block"></div>
+        <div class="block"></div>
+        <div class="block"></div>
+        <div class="block"></div>
+        <div class="block"></div>
+        <div class="block"></div>
+        <div class="block"></div>
+        <div class="block"></div>
+        <div class="block"></div>
+        <div class="block"></div>
+        <div class="block"></div>
+        <div class="block"></div>
+        <div class="block"></div>
+        <div class="block"></div>
+        <div class="block"></div>
+        <div class="block"></div>
+    </div>
+</body>
+</html>

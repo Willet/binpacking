@@ -1,18 +1,23 @@
 (function ($, undefined) {
+    // http://jmlr.org/papers/volume11/gyorgy10a/gyorgy10a.pdf
+    // http://i11www.iti.uni-karlsruhe.de/_media/teaching/sommer2010/approximationsonlinealgorithmen/onl-bp.pdf
     "use strict";
 
     var utils = {
-        getCoords: function (input) {
+        getCoords: function (input, includeMargins) {
             // @param input: either a left/right/top/bottom/... object,
             //               or a jquery element.
             // failed calculations will give you NaN.
             // TODO: short circuit applies to 0
+
+            includeMargins = includeMargins || false;  // can't default to true
+
             if (input.jquery) {  // this is $(element)
                 input = {
                     left: input.offset().left,
                     top: input.offset().top,
-                    width: input.outerWidth(true),
-                    height: input.outerHeight(true)
+                    width: input.outerWidth(includeMargins),
+                    height: input.outerHeight(includeMargins)
                 };
             }
             return {
@@ -40,80 +45,78 @@
     };
 
     $.fn.binpack = function (params) {
+        // TODO: allow params to be a list of objects to append
+        // (add target class to each element)
         var $host = this,
-            hostCoords = utils.getCoords($host),
+            settings,
+            collectCoords,
+            layoutContents;
 
-            settings = $.extend(
-                {},
-                {  // defaults
-                    target: '.bin',
-                    forceWidthMultiplier: true,
-                    columns: 1,
-                    columnWidth: 1  // 100%
-                },
-                params),
-
-            collectCoords = function ($host) {
-                // get list of (coords of each content).
-                // you should only trust their width/height values.
-                var $blocks = $(settings.target, $host),
-                    lstVectors = [];  // container
-
-                $.each($blocks, function (idx, obj) {
-                    var $obj = $(obj),
-                        coords = utils.getCoords();
-                    coords.element = $obj;  // keep it
-                    lstVectors.push(coords);
-                });
-                return lstVectors;
+        settings = $.extend(
+            {},
+            {  // defaults
+                target: '.bin',
+                columns: 0,  // dynamically generated
+                objects: []  // for things like 'append'
             },
+            params
+        );
 
-            layoutContents = function () {
-                var $blocks = $(settings.target, $host),  // blocks
-                    minRowHeight = 0,
-                    columnCounter = 0;
+        collectCoords = function ($host) {
+            // get list of (coords of each content).
+            // you should only trust their width/height values.
+            var $blocks = $(settings.target, $host),
+                lstVectors = [];  // container
 
-                $blocks.each(function (idx, block) {
-                    var $block = $(block),
-                        blockCoords = utils.getCoords($block),
-                        $prevBlock,
-                        prevBlockCoords;
-                    $block.css({position: 'absolute'});  // wee
+            $.each($blocks, function (idx, obj) {
+                var $obj = $(obj),
+                    coords = utils.getCoords();
+                coords.element = $obj;  // keep it
+                lstVectors.push(coords);
+            });
+            return lstVectors;
+        };
 
-                    if (idx === 0) {  // if this is not the first block, which
-                                    // should always be on the top left anyway
-                        $block.css({'left': 0, 'top': 0});
-                        minRowHeight = blockCoords.height;
-                        return;
-                    }
+        layoutContents = function () {
+            var $blocks = $(settings.target, $host),  // blocks
+                hostCoords = utils.getCoords($host),
+                columnBottoms = {},
+                maxColumnBottom = 0,
+                columnIndex = 0;
 
-                    // else (not the first block)
-                    $prevBlock = $($blocks[idx - 1]);
-                    prevBlockCoords = utils.getCoords($prevBlock);
-                    minRowHeight = Math.min(minRowHeight, prevBlockCoords.height);
+            if (!settings.columns) {
+                settings.columns = parseInt($host.innerWidth() / $blocks.eq(0).outerWidth(true), 10);
+            }
 
-                    var newCoords = {};
-                    if (prevBlockCoords.right + blockCoords.width <= hostCoords.right) {
-                        newCoords.top = prevBlockCoords.top;
-                        newCoords.left = prevBlockCoords.right;
-                    } else {
-                        newCoords.top = minRowHeight;
-                        newCoords.left = 0;
-                    }
+            $host.css('position', 'relative');
 
-                    $block.css(newCoords);
+            $blocks.each(function (idx, block) {
+                var $block = $(block),
+                    blockCoords = utils.getCoords($block, true),
+                    newStyles = {};
 
-                    // raise it by one and loop back to first column if needed
-                    columnCounter++;
-                    if (columnCounter >= settings.columns) {
-                        columnCounter = 0;
-                        minRowHeight  = Math.min.apply(this, []);
-                        if ($blocks[idx + 1]) {
-                            $($blocks[idx + 1]).css('left', 0);
-                        }
-                    }
-                });
-            };
+                newStyles.left = hostCoords.width / settings.columns * columnIndex;
+                newStyles.top = (columnBottoms[columnIndex] || 0);
+
+                $block.css({position: 'absolute'}).animate(newStyles, 650);
+
+                if (columnBottoms[columnIndex] !== undefined) {
+                    columnBottoms[columnIndex] += blockCoords.height || 0;
+                } else {
+                    columnBottoms[columnIndex] = blockCoords.height || 0;
+                }
+
+                if (columnBottoms[columnIndex] > maxColumnBottom) {
+                    maxColumnBottom = columnBottoms[columnIndex];
+                }
+
+                // advance or return the column index
+                // (++a returns a + 1)
+                columnIndex = (++columnIndex) % settings.columns;
+            });
+
+            $host.height(maxColumnBottom);
+        };
 
         if (params.bindResize) {
             $(window).resize(function () {

@@ -101,8 +101,8 @@
         return c * ((t = t / d - 1) * t * t * t * t + 1) + b;
     };
 
-    $.fn.binpack = function (params) {
-        // TODO: allow params to be a list of objects to append
+    function objInit(params) {
+        // handles $().binpack({ object })
         // (add target class to each element)
         var $host = this,
             settings = $.extend({}, defaults, params);
@@ -166,12 +166,14 @@
                     .animate(newStyles, settings.animationDuration, settings.easing);
 
                 if (columnBottoms[columnIndex] !== undefined) {
+                    // you can add anything to undefined and it becomes NaN
                     columnBottoms[columnIndex] += blockCoords.height || 0;
                 } else {
                     columnBottoms[columnIndex] = blockCoords.height || 0;
                 }
 
                 if (columnBottoms[columnIndex] > maxColumnBottom) {
+                    // tallying the play-date height of the container
                     maxColumnBottom = columnBottoms[columnIndex];
                 }
 
@@ -180,11 +182,28 @@
                 columnIndex = (++columnIndex) % numColumns;
             });
 
+            // pretend the container is actually containing the absolute stuff
             $host.height(maxColumnBottom);
         }
 
         attachEvents();
 
         return $host.each(layoutContents);  // chaining
+    }
+
+    $.fn.binpack = function () {
+        var params = arguments[0];
+
+        if (params instanceof Array) {
+            // [], but not {}
+        } else if (params instanceof Object) {
+            // [] and {}, but [] already got picked out by previous if statement
+            return objInit.apply(this, arguments);
+        } else if (typeof params === 'string' && arguments.length >= 2) {
+            // i.e. $.binpack('method', somethingElse)
+        } else {
+            // you did something really stupid
+            throw ('Unsupported calling method!');
+        }
     };
 }(jQuery));

@@ -2,6 +2,23 @@
 <html>
 <head>
     <title></title>
+    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.1/jquery.min.js"></script>
+    <script type="text/javascript" src="binpacking.js"></script>
+    <script type="text/javascript">
+        $(document).ready(function () {
+            "use strict";
+            $('.block', '#container').each(function (i, o) {
+                $(o).css({
+                    'height': 100 + Math.random() * 300
+                });
+            });
+
+            $('#container').binpack({
+                'target': '.block',
+                'bindResize': true
+            });
+        });
+    </script>
     <style type="text/css">
         #container {
             display: block;
@@ -23,27 +40,6 @@
             opacity: 0.7;
         }
     </style>
-    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.1/jquery.min.js"></script>
-    <script type="text/javascript" src="binpacking.js"></script>
-    <script type="text/javascript">
-        $(document).ready(function () {
-            $('.block', '#container').each(function (i, o) {
-                $(o).css({
-                    'height': 100 + Math.random() * 300
-                });
-            });
-
-            $('#container').binpack({
-                'target': '.block',
-                // 'columns': 4,
-                'bindResize': true
-            });
-
-            setTimeout(function () {
-                // window.location.reload(true);
-            }, 1000);
-        });
-    </script>
 </head>
 <body>
     <div id="container">

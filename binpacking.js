@@ -51,103 +51,102 @@
     // http://jmlr.org/papers/volume11/gyorgy10a/gyorgy10a.pdf
     // http://i11www.iti.uni-karlsruhe.de/_media/teaching/sommer2010/approximationsonlinealgorithmen/onl-bp.pdf
 
-    var defaults = {  // defaults
-            after: undefined, // for locating the element after which thigns are appended
-            debug: false,
-            target: '.bin',
-            easing: 'easeOutQuint',
-            columns: 0,  // dynamically generated
-            objects: [],  // for things like 'append'
-            animationDuration: 1450,
-            resizeFrequency: 300
-        },
-        utils = {
-            getCoords: function (input, includeMargins) {
-                // @param input: either a left/right/top/bottom/... object,
-                //               or a jquery element.
-                // failed calculations will give you NaN.
-                // TODO: short circuit applies to 0
+    var defaults, utils;
 
-                includeMargins = includeMargins || false;  // can't default to true
-
-                if (input.jquery) {  // this is $(element)
-                    input = {
-                        left: input.offset().left,
-                        top: input.offset().top,
-                        width: input.outerWidth(includeMargins),
-                        height: input.outerHeight(includeMargins)
-                    };
-                }
-                return {
-                    left: input.left || (input.right - input.width),
-                    top: input.top || (input.bottom - input.height),
-                    width: input.width || (input.right - input.left),
-                    height: input.height || (input.bottom - input.top),
-                    bottom: (input.top + input.height) || input.bottom,
-                    right: (input.left + input.width) || input.right
-                };
-            },
-            closestNum: function (target) {
-                // target, [numbers, ...]. returns the number closest to target.
-                var nums = {},
-                    diff = Infinity,
-                    diffs = [],
-                    i;
-                for (i = 1; i < arguments.length; i++) {
-                    diff = Math.abs(target - arguments[i]);
-                    diffs.push(diff);
-                    nums[diff] = arguments[i];
-                }
-                return nums[Math.min.apply(this, diffs)];
-            },
-            throttle: function (func, wait, options) {
-                // mod of _.throttle
-                //github.com/jashkenas/underscore/blob/1.5.1/underscore.js#L648
-                options = options || {};
-
-                var context, args, result,
-                    timeout = null,
-                    previous = 0,
-                    later = function () {
-                        previous = options.leading === false ? 0 : new Date();
-                        timeout = null;
-                        result = func.apply(context, args);
-                    };
-                return function () {
-                    var now = new Date(),
-                        remaining;
-                    if (!previous && options.leading === false) previous = now;
-                    remaining = wait - (now - previous);
-                    context = this;
-                    args = arguments;
-                    if (remaining <= 0) {
-                        clearTimeout(timeout);
-                        timeout = null;
-                        previous = now;
-                        result = func.apply(context, args);
-                    } else if (!timeout && options.trailing !== false) {
-                        timeout = setTimeout(later, remaining);
-                    }
-                    return result;
-                };
-            }
-        };
-
-    $.easing.easeOutQuint = $.easing.easeOutQuint || function (x, t, b, c, d) {
-        // mod of jquery.easing.easeOutQuint
-        // gsgd.co.uk/sandbox/jquery/easing/jquery.easing.1.3.js
-        return c * ((t = t / d - 1) * t * t * t * t + 1) + b;
+    defaults = {  // defaults
+        after: undefined, // for locating the element after which thigns are appended
+        debug: false,
+        target: '.bin',
+        easing: 'easeOutQuint',
+        columns: 0,  // dynamically generated
+        objects: [],  // for things like 'append'
+        animationDuration: 1450,
+        resizeFrequency: 300
     };
 
-    function initSettings($host, newSettings) {
+    utils = {
+        getCoords: function (input, includeMargins) {
+            // @param input: either a left/right/top/bottom/... object,
+            //               or a jquery element.
+            // failed calculations will give you NaN.
+            // TODO: short circuit applies to 0
+
+            includeMargins = includeMargins || false;  // can't default to true
+
+            if (input.jquery) {  // this is $(element)
+                input = {
+                    left: input.offset().left,
+                    top: input.offset().top,
+                    width: input.outerWidth(includeMargins),
+                    height: input.outerHeight(includeMargins)
+                };
+            }
+            return {
+                left: input.left || (input.right - input.width),
+                top: input.top || (input.bottom - input.height),
+                width: input.width || (input.right - input.left),
+                height: input.height || (input.bottom - input.top),
+                bottom: (input.top + input.height) || input.bottom,
+                right: (input.left + input.width) || input.right
+            };
+        },
+        closestNum: function (target) {
+            // target, [numbers, ...]. returns the number closest to target.
+            var nums = {},
+                diff = Infinity,
+                diffs = [],
+                i;
+            for (i = 1; i < arguments.length; i++) {
+                diff = Math.abs(target - arguments[i]);
+                diffs.push(diff);
+                nums[diff] = arguments[i];
+            }
+            return nums[Math.min.apply(this, diffs)];
+        },
+        throttle: function (func, wait, options) {
+            // mod of _.throttle
+            //github.com/jashkenas/underscore/blob/1.5.1/underscore.js#L648
+            options = options || {};
+
+            var context, args, result,
+                timeout = null,
+                previous = 0,
+                later = function () {
+                    previous = options.leading === false ? 0 : new Date();
+                    timeout = null;
+                    result = func.apply(context, args);
+                };
+            return function () {
+                var now = new Date(),
+                    remaining;
+                if (!previous && options.leading === false) previous = now;
+                remaining = wait - (now - previous);
+                context = this;
+                args = arguments;
+                if (remaining <= 0) {
+                    clearTimeout(timeout);
+                    timeout = null;
+                    previous = now;
+                    result = func.apply(context, args);
+                } else if (!timeout && options.trailing !== false) {
+                    timeout = setTimeout(later, remaining);
+                }
+                return result;
+            };
+        }
+    };
+
+    function initSettings($host, newSettings, prefix) {
+        prefix = prefix || 'binpack';
         if (newSettings) {  // set
-            $host.data('binpack-settings', newSettings);
+            $host.data(prefix + '-settings', newSettings);
         } else {  // get
-            newSettings = $host.data('binpack-settings');
-            if (!newSettings) {
+            var _settings = $host.data(prefix + '-settings');
+            if (!_settings) {
                 // save settings for other calling methods
-                newSettings = $.extend({}, defaults, params);
-                $host.data('binpack-settings', newSettings);
+                _settings = $.extend({}, defaults, newSettings);
+                $host.data(prefix + '-settings', _settings);
+                newSettings = _settings;
             }
         }
         return newSettings;
@@ -231,6 +230,14 @@
         }
 
         function attachEvents() {
+            // add the animation
+            $.easing.easeOutQuint = $.easing.easeOutQuint ||
+                function (x, t, b, c, d) {
+                    // mod of jquery.easing.easeOutQuint
+                    // gsgd.co.uk/sandbox/jquery/easing/jquery.easing.1.3.js
+                    return c * ((t = t / d - 1) * t * t * t * t + 1) + b;
+                };
+
             // events go here
             if (settings.bindResize) {
                 var throttledResize = utils.throttle(function () {
@@ -282,6 +289,12 @@
             return objInit.apply(this, arguments);
         } else if (typeof params === 'string' && arguments.length >= 2) {
             // i.e. $.binpack('method', somethingElse)
+            switch (params) {
+            case 'append':
+                return arrayInit.apply(this, arguments);
+            default:
+                throw ('Unsupported calling method!');
+            }
         } else {
             // you did something really stupid
             throw ('Unsupported calling method!');

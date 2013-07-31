@@ -1,9 +1,9 @@
 (function ($, undefined) {
     /*  binpacking.js (aka massive-octo-batman, as recommended by GitHub)
 
-        Configuration options: see 'settings' variable.
-
-        re-licensing restrictions:
+        Configuration options: see 'settings' variable.                        // further reading:
+                                                                               // http://jmlr.org/papers/volume11/gyorgy10a/gyorgy10a.pdf
+        re-licensing restrictions:                                             // http://i11www.iti.uni-karlsruhe.de/_media/teaching/sommer2010/approximationsonlinealgorithmen/onl-bp.pdf
         * underscore.js (or its portions) is licensed under MIT.
           (c) 2009-2013 Jeremy Ashkenas, DocumentCloud and
           Investigative Reporters & Editors
@@ -47,13 +47,10 @@
         OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
      */
     "use strict";
-    // further reading:
-    // http://jmlr.org/papers/volume11/gyorgy10a/gyorgy10a.pdf
-    // http://i11www.iti.uni-karlsruhe.de/_media/teaching/sommer2010/approximationsonlinealgorithmen/onl-bp.pdf
 
     var defaults, utils;
 
-    defaults = {  // defaults
+    defaults = {
         after: undefined, // for locating the element after which thigns are appended
         debug: false,
         target: '.bin',
@@ -137,6 +134,8 @@
     };
 
     function initSettings($host, newSettings, prefix) {
+        // if you give in newSettings, newSettings becomes the new settings.
+        // returns settings, old or new.
         prefix = prefix || 'binpack';
         if (newSettings) {  // set
             $host.data(prefix + '-settings', newSettings);
@@ -146,8 +145,8 @@
                 // save settings for other calling methods
                 _settings = $.extend({}, defaults, newSettings);
                 $host.data(prefix + '-settings', _settings);
-                newSettings = _settings;
             }
+            newSettings = _settings;
         }
         return newSettings;
     }
@@ -181,10 +180,17 @@
             newStyles.left = hostCoords.width / numColumns * columnIndex;
             newStyles.top = (columnBottoms[columnIndex] || 0);
 
-            $block
-                .css({position: 'absolute'})
-                .stop()  // keep moving elements in place
-                .animate(newStyles, settings.animationDuration, settings.easing);
+            // TODO: isolate if needed
+            (function animateBlock($block, newStyles, settings) {
+                $block
+                    .css({position: 'absolute'})
+                    .stop()  // keep moving elements in place
+                    .animate(
+                        newStyles,
+                        settings.animationDuration,
+                        settings.easing
+                    );
+            }($block, newStyles, settings));
 
             if (columnBottoms[columnIndex] !== undefined) {
                 // you can add anything to undefined and it becomes NaN
@@ -205,6 +211,17 @@
 
         // pretend the container is actually containing the absolute stuff
         $host.height(maxColumnBottom);
+    }
+
+    // TODO: isolate if needed
+    function setup() {
+        // add the animation
+        $.easing.easeOutQuint = $.easing.easeOutQuint ||
+            function (x, t, b, c, d) {
+                // mod of jquery.easing.easeOutQuint
+                // gsgd.co.uk/sandbox/jquery/easing/jquery.easing.1.3.js
+                return c * ((t = t / d - 1) * t * t * t * t + 1) + b;
+            };
     }
 
     function objInit(params) {
@@ -229,15 +246,10 @@
             return lstVectors;
         }
 
-        function attachEvents() {
-            // add the animation
-            $.easing.easeOutQuint = $.easing.easeOutQuint ||
-                function (x, t, b, c, d) {
-                    // mod of jquery.easing.easeOutQuint
-                    // gsgd.co.uk/sandbox/jquery/easing/jquery.easing.1.3.js
-                    return c * ((t = t / d - 1) * t * t * t * t + 1) + b;
-                };
+        layoutContents($host, settings);
 
+        // TODO: isolate if needed
+        (function attachEvents() {
             // events go here
             if (settings.bindResize) {
                 var throttledResize = utils.throttle(function () {
@@ -251,11 +263,7 @@
             if (settings.debug) {
                 window.utils = utils;
             }
-        }
-
-        layoutContents($host, settings);
-
-        attachEvents();
+        }());
 
         return $host.each(function (i, o) {  // chaining
             layoutContents($(o));
@@ -266,7 +274,6 @@
         // handles $().binpack([ elements ], [after=undefined])
         // (appends target class to each element)
         var $host = this,
-            newParams,
             targetElement;
         if (after) {
             targetElement = after;  // well you specified it
@@ -275,30 +282,32 @@
             $host.append($elements);
         }
 
+        setup();
         layoutContents($host, undefined);
 
         return $host.each($.noop);
     }
 
     $.fn.binpack = function (params) {
-        if (params instanceof Array) {
-            // [], but not {}
+        if (params instanceof Array) {                                         // [], but not {}
             return arrayInit.apply(this, arguments);
-        } else if (params instanceof Object) {
-            // [] and {}, but [] already got picked out by previous if statement
+        } else if (params instanceof Object) {                                 // [] and {}, but [] already got picked out by previous if statement
             return objInit.apply(this, arguments);
-        } else if (typeof params === 'string' && arguments.length >= 2) {
-            // i.e. $.binpack('method', somethingElse)
+        } else if (typeof params === 'string' && arguments.length >= 2) {      // i.e. $.binpack('method', somethingElse)
             switch (params) {
             case 'append':
                 return arrayInit.apply(this, arguments);
             default:
-                throw ('Unsupported calling method!');
+                // nothing
             }
-        } else {
-            // you did something really stupid
-            throw ('Unsupported calling method!');
-            // return this.each($.noop);
         }
+        // you did something really stupid
+        throw ('Unsupported calling method!');
     };
+
+    (function (mediator) {
+        // hooks
+        mediator.on('resize', layoutContents);
+    }(window.Willet && window.Willet.mediator));
+
 }(jQuery));

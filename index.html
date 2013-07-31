@@ -9,6 +9,7 @@
             "use strict";
             $('.block', '#container').each(function (i, o) {
                 $(o).css({
+                    'width': 300 * (1 + Math.round(Math.random())),
                     'height': 100 + Math.random() * 300
                 });
             });
@@ -28,7 +29,7 @@
             max-width: */ 100%;
             margin: 0 auto;
             padding: 0;
-            background: #1ab2c4;
+            background: #1ab2c3;
         }
         .block {
             border: 1px solid silver;

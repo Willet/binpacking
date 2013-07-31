@@ -1,20 +1,58 @@
 (function ($, undefined) {
-    /*  binpacking.js
+    /*  binpacking.js (aka massive-octo-batman, as recommended by GitHub)
 
-        options: see 'settings' variable.
+        Configuration options: see 'settings' variable.
 
         re-licensing restrictions:
         * underscore.js (or its portions) is licensed under MIT.
+          (c) 2009-2013 Jeremy Ashkenas, DocumentCloud and
+          Investigative Reporters & Editors
         * jquery.easing.1.3.js is licensed under BSD.
+          Copyright © 2008 George McGinley Smith
 
-        Willet Inc. claims copyright to all remaining portions of this code.
+        Willet Inc. claims copyright to all remaining portions of this code,
+        licensing them under hybrid BSD and MIT licenses:
 
+        Permission is hereby granted, free of charge, to any person obtaining
+        a copy of this software and associated documentation files (the
+        "Software"), to deal in the Software without restriction, including
+        without limitation the rights to use, copy, modify, merge, publish,
+        distribute, sublicense, and/or sell copies of the Software, and to
+        permit persons to whom the Software is furnished to do so, subject to
+        the following conditions:
+
+        - The above copyright notice and this permission notice shall be
+        included in all copies or substantial portions of the Software.
+
+        - Redistributions of source code must retain the above copyright notice,
+        this list of conditions and the following disclaimer.
+        - Redistributions in binary form must reproduce the above copyright
+        notice, this list of conditions and the following disclaimer in the
+        documentation and/or other materials provided with the distribution.
+
+        - Neither the name of the author nor the names of contributors may be
+        used to endorse or promote products derived from this software without
+        specific prior written permission.
+
+        THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+        "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+        LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+        A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+        OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+        SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+        LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+        DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+        THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+        (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+        OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
      */
+    "use strict";
+    // further reading:
     // http://jmlr.org/papers/volume11/gyorgy10a/gyorgy10a.pdf
     // http://i11www.iti.uni-karlsruhe.de/_media/teaching/sommer2010/approximationsonlinealgorithmen/onl-bp.pdf
-    "use strict";
 
     var defaults = {  // defaults
+            after: undefined, // for locating the element after which thigns are appended
             debug: false,
             target: '.bin',
             easing: 'easeOutQuint',
@@ -101,11 +139,81 @@
         return c * ((t = t / d - 1) * t * t * t * t + 1) + b;
     };
 
+    function initSettings($host, newSettings) {
+        if (newSettings) {  // set
+            $host.data('binpack-settings', newSettings);
+        } else {  // get
+            newSettings = $host.data('binpack-settings');
+            if (!newSettings) {
+                // save settings for other calling methods
+                newSettings = $.extend({}, defaults, params);
+                $host.data('binpack-settings', newSettings);
+            }
+        }
+        return newSettings;
+    }
+
+    function layoutContents($host, settings) {
+        // guess what this does
+
+        settings = initSettings($host);
+
+        var $blocks = $(settings.target, $host),  // blocks
+            numColumns = settings.columns,
+            hostCoords = utils.getCoords($host),
+            columnBottoms = {},
+            maxColumnBottom = 0,
+            columnIndex = 0;
+
+        if (!numColumns) {
+            // auto-calculate number of columns based on
+            // the width of the first block
+            numColumns = parseInt($host.innerWidth() / $blocks.eq(0).outerWidth(true), 10);
+        }
+
+        // this is necessary
+        $host.css('position', 'relative');
+
+        $blocks.each(function (idx, block) {
+            var $block = $(block),
+                blockCoords = utils.getCoords($block, true),
+                newStyles = {};
+
+            newStyles.left = hostCoords.width / numColumns * columnIndex;
+            newStyles.top = (columnBottoms[columnIndex] || 0);
+
+            $block
+                .css({position: 'absolute'})
+                .stop()  // keep moving elements in place
+                .animate(newStyles, settings.animationDuration, settings.easing);
+
+            if (columnBottoms[columnIndex] !== undefined) {
+                // you can add anything to undefined and it becomes NaN
+                columnBottoms[columnIndex] += blockCoords.height || 0;
+            } else {
+                columnBottoms[columnIndex] = blockCoords.height || 0;
+            }
+
+            if (columnBottoms[columnIndex] > maxColumnBottom) {
+                // tallying the play-date height of the container
+                maxColumnBottom = columnBottoms[columnIndex];
+            }
+
+            // advance or return the column index
+            // (++a returns a + 1)
+            columnIndex = (++columnIndex) % numColumns;
+        });
+
+        // pretend the container is actually containing the absolute stuff
+        $host.height(maxColumnBottom);
+    }
+
     function objInit(params) {
         // handles $().binpack({ object })
         // (add target class to each element)
-        var $host = this,
-            settings = $.extend({}, defaults, params);
+        var $host = this, settings;
+
+        settings = initSettings($host, params);
 
         function collectCoords($host) {
             // get list of (coords of each content).
@@ -126,7 +234,9 @@
             // events go here
             if (settings.bindResize) {
                 var throttledResize = utils.throttle(function () {
-                    $host.each(layoutContents);
+                    $host.each(function (i, o) {
+                        layoutContents($(o));
+                    });
                 }, settings.resizeFrequency);
                 $(window).resize(throttledResize);
             }
@@ -136,66 +246,37 @@
             }
         }
 
-        function layoutContents() {
-            // guess what this does
-            var $blocks = $(settings.target, $host),  // blocks
-                numColumns = settings.columns,
-                hostCoords = utils.getCoords($host),
-                columnBottoms = {},
-                maxColumnBottom = 0,
-                columnIndex = 0;
-
-            if (!numColumns) {
-                numColumns = parseInt($host.innerWidth() / $blocks.eq(0).outerWidth(true), 10);
-            }
-
-            // TODO: is this necessary?
-            $host.css('position', 'relative');
-
-            $blocks.each(function (idx, block) {
-                var $block = $(block),
-                    blockCoords = utils.getCoords($block, true),
-                    newStyles = {};
-
-                newStyles.left = hostCoords.width / numColumns * columnIndex;
-                newStyles.top = (columnBottoms[columnIndex] || 0);
-
-                $block
-                    .css({position: 'absolute'})
-                    .stop()
-                    .animate(newStyles, settings.animationDuration, settings.easing);
-
-                if (columnBottoms[columnIndex] !== undefined) {
-                    // you can add anything to undefined and it becomes NaN
-                    columnBottoms[columnIndex] += blockCoords.height || 0;
-                } else {
-                    columnBottoms[columnIndex] = blockCoords.height || 0;
-                }
-
-                if (columnBottoms[columnIndex] > maxColumnBottom) {
-                    // tallying the play-date height of the container
-                    maxColumnBottom = columnBottoms[columnIndex];
-                }
-
-                // advance or return the column index
-                // (++a returns a + 1)
-                columnIndex = (++columnIndex) % numColumns;
-            });
-
-            // pretend the container is actually containing the absolute stuff
-            $host.height(maxColumnBottom);
-        }
+        layoutContents($host, settings);
 
         attachEvents();
 
-        return $host.each(layoutContents);  // chaining
+        return $host.each(function (i, o) {  // chaining
+            layoutContents($(o));
+        });
     }
 
-    $.fn.binpack = function () {
-        var params = arguments[0];
+    function arrayInit($elements, after) {
+        // handles $().binpack([ elements ], [after=undefined])
+        // (appends target class to each element)
+        var $host = this,
+            newParams,
+            targetElement;
+        if (after) {
+            targetElement = after;  // well you specified it
+            $elements.insertAfter(targetElement);
+        } else {  // put at the end
+            $host.append($elements);
+        }
 
+        layoutContents($host, undefined);
+
+        return $host.each($.noop);
+    }
+
+    $.fn.binpack = function (params) {
         if (params instanceof Array) {
             // [], but not {}
+            return arrayInit.apply(this, arguments);
         } else if (params instanceof Object) {
             // [] and {}, but [] already got picked out by previous if statement
             return objInit.apply(this, arguments);
@@ -204,6 +285,7 @@
         } else {
             // you did something really stupid
             throw ('Unsupported calling method!');
+            // return this.each($.noop);
         }
     };
 }(jQuery));

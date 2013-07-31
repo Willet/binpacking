@@ -13,10 +13,12 @@
                 });
             });
 
-            $('#container').binpack({
-                'target': '.block',
-                'bindResize': true
-            });
+            $('#container')
+                .binpack({
+                    'target': '.block',
+                    'bindResize': true
+                })
+                .binpack([$('<div />', {'class': 'block', 'html': '21'})]);
         });
     </script>
     <style type="text/css">

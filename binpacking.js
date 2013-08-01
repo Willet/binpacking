@@ -53,10 +53,10 @@
         debug: false,
         target: '.bin',
         easing: 'easeOutQuint',
-        columns: 0,  // dynamically generated
+        columnWidth: 0,
         objects: [],  // for things like 'append'
-        animationDuration: 1450,
-        resizeFrequency: 300
+        animationDuration: 600,
+        resizeFrequency: 600
     };
 
     function getCoords(input, includeMargins) {
@@ -152,6 +152,22 @@
         };
     }
 
+    function $pluck($objList, attrib, method) {
+        // like _.pluck, but on a list of objects.
+        // you can also do $pluck($('.bin'), true, 'outerHeight')
+        return $objList.map(function (idx, obj) {
+            return $(obj)[method || 'prop'](attrib);
+        });
+    }
+
+    function relayoutInstance($element) {
+        var instance = $element.data('binpackInstance');
+        if (instance) {
+            console.log('resize');
+            instance.layout();
+        }
+    }
+
     function objInit(params) {
         // handles $().binpack({ object })
         // (add target class to each element)
@@ -186,11 +202,9 @@
             (function attachEvents() {
                 // events go here
                 if (settings.bindResize) {
-                    var throttledResize = throttle(function () {
-                        var instance = $host.data('binpackInstance');
-                        instance.layout();
-                    }, settings.resizeFrequency);
-                    $(window).resize(throttledResize);
+                    $(window).resize(throttle(function () {
+                        relayoutInstance($host);
+                    }, settings.resizeFrequency));
                 }
             }());
 
@@ -214,31 +228,101 @@
         return objInit.apply($host);
     }
 
+    // ========================================================================
+
     function BinPack(settings) {
         // definition of a BinPack "job"
         this.settings = settings;
         this.$container = null;
+        this.columns = {};
     }
+
+    BinPack.prototype.getColumnWidth = function () {
+        // TODO: dynamic callable width (typeof === 'function')
+        if (this.settings.columnWidth) {
+            return this.settings.columnWidth;
+        } else {
+            // if column width is not specified, use the width of the first item
+            var firstItem = $(this.settings.target, this.$container).eq(0);
+            return firstItem.outerWidth(true);
+        }
+    };
+
+    BinPack.prototype.getNumColumns = function () {
+        // calculate the number of columns
+        return Math.floor(this.$container.innerWidth() / this.getColumnWidth());
+    };
+
+    BinPack.prototype.initColumns = function (columnCount) {
+        this.columns = {};
+        for (var i = 0; i < columnCount; i++) {
+            this.columns[i] = {
+                'contents': [],
+                'width': this.settings.columnWidth,
+                'height': 0
+            };
+        }
+    };
+
+    BinPack.prototype.addBinToColumn = function (columnId, $bin) {
+        // @return: {columnId:
+        //             { contents: [bin, bin, bin],
+        //               width: 1234
+        //               height: 1234
+        //             },
+        //           columnId: ...
+        //          }
+        try {
+            this.columns[columnId].contents.push($bin);
+        } catch (err) {
+            this.columns[columnId].contents = [$bin];
+        }
+        var blockHeights = $(this.columns.contents).map(function (i, o) {
+            return $(o).outerHeight(true);
+        });
+        this.columns[columnId].width = Math.max.apply(null, blockHeights);
+
+        return this.columns;
+    };
+
+    BinPack.prototype.getColumns = function () {
+        return this.columns;
+    };
+
+    BinPack.prototype.transitBlock = function ($bin, x, y) {
+        // move with css
+        if ($.support.transition) {
+            $bin.css({
+                left: x,
+                top: y,
+                'transition': 'all ' + this.settings.animationDuration +
+                    'ms cubic-bezier(0.230, 1.000, 0.320, 1.000)',
+                'transition-timing-function': 'cubic-bezier(0.165, 0.840, 0.440, 1.000)'
+            });
+        } else {  // jquery fallback
+            $bin.animate({
+                left: x,
+                top: y
+            }, settings.animationDuration, $settings.easing);
+        }
+    };
 
     BinPack.prototype.layout = function () {
         // guess what this does
-        var instance = this,
-            $blocks = $(instance.settings.target, instance.$container),  // blocks
-            numColumns = instance.settings.columns,
-            hostCoords = getCoords(instance.$container),
+        var instance = this,  // this is a JS variable
+            $container = instance.$container,  // this is the $(DOM element)
+            settings = instance.settings,
+            $blocks = $(settings.target, $container),  // blocks
+            numColumns = instance.getNumColumns(),
+            hostCoords = getCoords($container),
             columnBottoms = {},
             maxColumnBottom = 0,
             columnIndex = 0;
 
-        if (!numColumns) {
-            // auto-calculate number of columns based on
-            // the width of the first block
-            numColumns = parseInt(instance.$container.innerWidth() /
-                $blocks.eq(0).outerWidth(true), 10);
-        }
+        instance.initColumns();
 
         // this is necessary
-        instance.$container.css('position', 'relative');
+        $container.css('position', 'relative');
 
         $blocks.each(function (idx, block) {
             var $block = $(block),
@@ -248,12 +332,13 @@
             newStyles.left = hostCoords.width / numColumns * columnIndex;
             newStyles.top = (columnBottoms[columnIndex] || 0);
 
-            $block
-                .css({position: 'absolute'})  // make them movable
-                .stop()  // keep moving elements in place
-                .animate(newStyles,
-                         instance.settings.animationDuration,
-                         instance.settings.easing);
+            $block.css({position: 'absolute'}).stop();                         // keep moving elements in place
+            /*
+            $block.animate(newStyles,
+                           settings.animationDuration,
+                           settings.easing);
+            */
+            instance.transitBlock($block, newStyles.left, newStyles.top);
 
             if (columnBottoms[columnIndex] !== undefined) {
                 // you can add anything to undefined and it becomes NaN
@@ -273,18 +358,20 @@
         });
 
         // pretend the container is actually containing the absolute stuff
-        instance.$container.height(maxColumnBottom);
+        $container.height(maxColumnBottom);
     };
 
     // add the animation
-    $.easing.easeOutQuint = $.easing.easeOutQuint ||
-        function (x, t, b, c, d) {
-            // mod of jquery.easing.easeOutQuint
+    if (!$.easing.easeOutQuint) {
+        $.easing.easeOutQuint = function (x, t, b, c, d) {
+            // jquery.easing.easeOutQuint
             // gsgd.co.uk/sandbox/jquery/easing/jquery.easing.1.3.js
             return c * ((t = t / d - 1) * t * t * t * t + 1) + b;
         };
+    }
 
     $.fn.binpack = function (params) {
+        // this is a $(DOM element of the container)
         if (params instanceof Array) {                                         // [], but not {}
             return arrayInit.apply(this, arguments);
         } else if (params instanceof Object) {                                 // [] and {}, but [] already got picked out by previous if statement
@@ -296,7 +383,7 @@
             case 'layout':
                 return this.data('binpackInstance').layout();
             default:
-                // nothing
+                // pass
             }
         }
         // you did something really stupid
@@ -306,7 +393,7 @@
     (function (mediator) {
         // hooks
         if (mediator) {
-            mediator.on('layoutContents', layoutContents);
+            mediator.on('layout', relayoutInstance);
         }
     }(window.Willet && window.Willet.mediator));
 

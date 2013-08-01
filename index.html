@@ -2,7 +2,8 @@
 <html>
 <head>
     <title></title>
-    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.1/jquery.min.js"></script>
+    <script type="text/javascript" src="jquery.1.10.1.min.js"></script>
+    <script type="text/javascript" src="jquery.transition.min.js"></script>
     <script type="text/javascript" src="binpacking.js"></script>
     <script type="text/javascript">
         $(document).ready(function () {
@@ -20,25 +21,24 @@
                     'bindResize': true,
                     'animationDuration': 600
                 })
-                .binpack([$('<div />', {'class': 'block', 'html': '21'})]);
+                .binpack([$('<div />', {'class': 'bin', 'html': '21'})]);
         });
     </script>
     <style type="text/css">
         #container {
             display: block;
-            width: /* 1600px;
-            max-width: */ 100%;
+            width: 100%;
             margin: 0 auto;
             padding: 0;
             background: #1ab2c3;
+            font-family: sans-serif;
         }
         .bin {
             border: 1px solid silver;
             border-radius: 3px;
-            margin: 5px;
             width: 300px;
             height: 200px;
-            border-radius: 3px;
+            margin: 5px;
             box-shadow: 0 1px 3px 0 rgba(0,0,0,0.33);
             background: #fff;
             opacity: 0.7;

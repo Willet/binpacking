@@ -48,9 +48,7 @@
      */
     "use strict";
 
-    var defaults;
-
-    defaults = {
+    var defaults = {
         after: undefined, // for locating the element after which thigns are appended
         debug: false,
         target: '.bin',
@@ -86,7 +84,28 @@
             right: (input.left + input.width) || input.right
         };
     }
-    
+
+    function each(obj, iterator, context) {
+        // mod of _.each
+        //github.com/jashkenas/underscore/blob/1.5.1/underscore.js#L76
+        if (obj === null) {
+            return;
+        }
+        if (obj.forEach) {
+            obj.forEach(iterator, context);
+        } else if (obj.length === +obj.length) {
+            for (var i = 0, l = obj.length; i < l; i++) {
+                iterator.call(context, obj[i], i, obj);
+            }
+        } else {
+            for (var objKey in obj) {
+                if (obj.hasOwnProperty(objKey)) {
+                    iterator.call(context, obj[objKey], objKey, obj);
+                }
+            }
+        }
+    }
+
     function closestNum(target) {
         // target, [numbers, ...]. returns the number closest to target.
         var nums = {},
@@ -100,7 +119,7 @@
         }
         return nums[Math.min.apply(this, diffs)];
     }
-    
+
     function throttle(func, wait, options) {
         // mod of _.throttle
         //github.com/jashkenas/underscore/blob/1.5.1/underscore.js#L648
@@ -133,186 +152,50 @@
         };
     }
 
-    // TODO: isolate if needed
-    function setup() {
-        // add the animation
-        $.easing.easeOutQuint = $.easing.easeOutQuint ||
-            function (x, t, b, c, d) {
-                // mod of jquery.easing.easeOutQuint
-                // gsgd.co.uk/sandbox/jquery/easing/jquery.easing.1.3.js
-                return c * ((t = t / d - 1) * t * t * t * t + 1) + b;
-            };
-    }
-
     function objInit(params) {
         // handles $().binpack({ object })
         // (add target class to each element)
-        var $host = this, settings;
+        var binPacker, $hosts = this, settings;
 
         function initSettings(newSettings, prefix) {
             // if you give in newSettings, newSettings becomes the new settings.
             // returns settings, old or new.
             prefix = prefix || 'binpack';
             if (newSettings) {  // set
-                $host.data(prefix + '-settings', newSettings);
+                $hosts.data(prefix + '-settings', newSettings);
             } else {  // get
-                var _settings = $host.data(prefix + '-settings');
+                var _settings = $hosts.data(prefix + '-settings');
                 if (!_settings) {
                     // save settings for other calling methods
                     _settings = $.extend({}, defaults, newSettings);
-                    $host.data(prefix + '-settings', _settings);
+                    $hosts.data(prefix + '-settings', _settings);
                 }
                 newSettings = _settings;
             }
             return newSettings;
         }
 
-        function layoutContentsByFixedColumns() {
-            // guess what this does
+        return $hosts.each(function (i, host) {  // chaining
+            var $host = $(host);
+            settings = initSettings(params);
+            binPacker = new BinPack(settings);
+            binPacker.$container = $host;
+            binPacker.layout();
 
-            var $blocks = $(settings.target, $host),  // blocks
-                numColumns = settings.columns,
-                hostCoords = getCoords($host),
-                columnBottoms = {},
-                maxColumnBottom = 0,
-                columnIndex = 0;
-
-            if (!numColumns) {
-                // auto-calculate number of columns based on
-                // the width of the first block
-                numColumns = parseInt($host.innerWidth() / $blocks.eq(0).outerWidth(true), 10);
-            }
-
-            // this is necessary
-            $host.css('position', 'relative');
-
-            $blocks.each(function (idx, block) {
-                var $block = $(block),
-                    blockCoords = getCoords($block, true),
-                    newStyles = {};
-
-                newStyles.left = hostCoords.width / numColumns * columnIndex;
-                newStyles.top = (columnBottoms[columnIndex] || 0);
-
-                // TODO: isolate if needed
-                (function animateBlock($block, newStyles, settings) {
-                    $block
-                        .css({position: 'absolute'})
-                        .stop()  // keep moving elements in place
-                        .animate(
-                            newStyles,
-                            settings.animationDuration,
-                            settings.easing
-                        );
-                }($block, newStyles, settings));
-
-                if (columnBottoms[columnIndex] !== undefined) {
-                    // you can add anything to undefined and it becomes NaN
-                    columnBottoms[columnIndex] += blockCoords.height || 0;
-                } else {
-                    columnBottoms[columnIndex] = blockCoords.height || 0;
+            // TODO: isolate if needed
+            (function attachEvents() {
+                // events go here
+                if (settings.bindResize) {
+                    var throttledResize = throttle(function () {
+                        var instance = $host.data('binpackInstance');
+                        instance.layout();
+                    }, settings.resizeFrequency);
+                    $(window).resize(throttledResize);
                 }
+            }());
 
-                if (columnBottoms[columnIndex] > maxColumnBottom) {
-                    // tallying the play-date height of the container
-                    maxColumnBottom = columnBottoms[columnIndex];
-                }
-
-                // advance or return the column index
-                // (++a returns a + 1)
-                columnIndex = (++columnIndex) % numColumns;
-            });
-
-            // pretend the container is actually containing the absolute stuff
-            $host.height(maxColumnBottom);
-        }
-
-        function layoutContents() {
-            // guess what this does
-
-            var $blocks = $(settings.target, $host),  // blocks
-                hostCoords = getCoords($host),
-                columnBottoms = {},
-                maxColumnBottom = 0,
-                columnIndex = 0;
-
-            // this is necessary
-            $host.css('position', 'relative');
-
-            $blocks.each(function (idx, block) {
-                var $block = $(block),
-                    blockCoords = getCoords($block, true),
-                    newStyles = {};
-
-                newStyles.left = hostCoords.width / numColumns * columnIndex;
-                newStyles.top = (columnBottoms[columnIndex] || 0);
-
-                // TODO: isolate if needed
-                (function animateBlock($block, newStyles, settings) {
-                    $block
-                        .css({position: 'absolute'})
-                        .stop()  // keep moving elements in place
-                        .animate(
-                            newStyles,
-                            settings.animationDuration,
-                            settings.easing
-                        );
-                }($block, newStyles, settings));
-
-                if (columnBottoms[columnIndex] !== undefined) {
-                    // you can add anything to undefined and it becomes NaN
-                    columnBottoms[columnIndex] += blockCoords.height || 0;
-                } else {
-                    columnBottoms[columnIndex] = blockCoords.height || 0;
-                }
-
-                if (columnBottoms[columnIndex] > maxColumnBottom) {
-                    // tallying the play-date height of the container
-                    maxColumnBottom = columnBottoms[columnIndex];
-                }
-
-                // advance or return the column index
-                // (++a returns a + 1)
-                columnIndex = (++columnIndex) % numColumns;
-            });
-
-            // pretend the container is actually containing the absolute stuff
-            $host.height(maxColumnBottom);
-        }
-
-        function collectCoords() {
-            // get list of (coords of each content).
-            // you should only trust their width/height values.
-            var $blocks = $(settings.target, $host),
-                lstVectors = [];  // container
-
-            $.each($blocks, function (idx, obj) {
-                var $obj = $(obj),
-                    coords = getCoords();
-                coords.element = $obj;  // keep it
-                lstVectors.push(coords);
-            });
-            return lstVectors;
-        }
-
-        settings = initSettings(params);
-        layoutContents();
-
-        // TODO: isolate if needed
-        (function attachEvents() {
-            // events go here
-            if (settings.bindResize) {
-                var throttledResize = throttle(function () {
-                    $host.each(function (i, o) {
-                        layoutContents($(o));
-                    });
-                }, settings.resizeFrequency);
-                $(window).resize(throttledResize);
-            }
-        }());
-
-        return $host.each(function (i, o) {  // chaining
-            layoutContents($(o));
+            // jQuery-bound data object keeps reference of this instance
+            $host.data('binpackInstance', binPacker);
         });
     }
 
@@ -328,9 +211,78 @@
             $host.append($elements);
         }
 
-        setup();
         return objInit.apply($host);
     }
+
+    function BinPack(settings) {
+        // definition of a BinPack "job"
+        this.settings = settings;
+        this.$container = null;
+    }
+
+    BinPack.prototype.layout = function () {
+        // guess what this does
+        var instance = this,
+            $blocks = $(instance.settings.target, instance.$container),  // blocks
+            numColumns = instance.settings.columns,
+            hostCoords = getCoords(instance.$container),
+            columnBottoms = {},
+            maxColumnBottom = 0,
+            columnIndex = 0;
+
+        if (!numColumns) {
+            // auto-calculate number of columns based on
+            // the width of the first block
+            numColumns = parseInt(instance.$container.innerWidth() /
+                $blocks.eq(0).outerWidth(true), 10);
+        }
+
+        // this is necessary
+        instance.$container.css('position', 'relative');
+
+        $blocks.each(function (idx, block) {
+            var $block = $(block),
+                blockCoords = getCoords($block, true),
+                newStyles = {};
+
+            newStyles.left = hostCoords.width / numColumns * columnIndex;
+            newStyles.top = (columnBottoms[columnIndex] || 0);
+
+            $block
+                .css({position: 'absolute'})  // make them movable
+                .stop()  // keep moving elements in place
+                .animate(newStyles,
+                         instance.settings.animationDuration,
+                         instance.settings.easing);
+
+            if (columnBottoms[columnIndex] !== undefined) {
+                // you can add anything to undefined and it becomes NaN
+                columnBottoms[columnIndex] += blockCoords.height || 0;
+            } else {
+                columnBottoms[columnIndex] = blockCoords.height || 0;
+            }
+
+            if (columnBottoms[columnIndex] > maxColumnBottom) {
+                // tallying the play-date height of the container
+                maxColumnBottom = columnBottoms[columnIndex];
+            }
+
+            // advance or return the column index
+            // (++a returns a + 1)
+            columnIndex = (++columnIndex) % numColumns;
+        });
+
+        // pretend the container is actually containing the absolute stuff
+        instance.$container.height(maxColumnBottom);
+    };
+
+    // add the animation
+    $.easing.easeOutQuint = $.easing.easeOutQuint ||
+        function (x, t, b, c, d) {
+            // mod of jquery.easing.easeOutQuint
+            // gsgd.co.uk/sandbox/jquery/easing/jquery.easing.1.3.js
+            return c * ((t = t / d - 1) * t * t * t * t + 1) + b;
+        };
 
     $.fn.binpack = function (params) {
         if (params instanceof Array) {                                         // [], but not {}
@@ -341,6 +293,8 @@
             switch (params) {
             case 'append':
                 return arrayInit.apply(this, arguments);
+            case 'layout':
+                return this.data('binpackInstance').layout();
             default:
                 // nothing
             }

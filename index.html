@@ -9,7 +9,7 @@
             "use strict";
             $('.block', '#container').each(function (i, o) {
                 $(o).css({
-                    'width': 300 * (1 + Math.round(Math.random())),
+                    /* 'width': 300 * (1 + Math.round(Math.random())), */
                     'height': 100 + Math.random() * 300
                 });
             });
@@ -17,7 +17,8 @@
             $('#container')
                 .binpack({
                     'target': '.block',
-                    'bindResize': true
+                    'bindResize': true,
+                    // 'animationDuration': 0
                 })
                 .binpack([$('<div />', {'class': 'block', 'html': '21'})]);
         });

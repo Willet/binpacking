@@ -48,7 +48,7 @@
      */
     "use strict";
 
-    var defaults, utils;
+    var defaults;
 
     defaults = {
         after: undefined, // for locating the element after which thigns are appended
@@ -61,156 +61,76 @@
         resizeFrequency: 300
     };
 
-    utils = {
-        getCoords: function (input, includeMargins) {
-            // @param input: either a left/right/top/bottom/... object,
-            //               or a jquery element.
-            // failed calculations will give you NaN.
-            // TODO: short circuit applies to 0
+    function getCoords(input, includeMargins) {
+        // @param input: either a left/right/top/bottom/... object,
+        //               or a jquery element.
+        // failed calculations will give you NaN.
+        // TODO: short circuit applies to 0
 
-            includeMargins = includeMargins || false;  // can't default to true
+        includeMargins = includeMargins || false;  // can't default to true
 
-            if (input.jquery) {  // this is $(element)
-                input = {
-                    left: input.offset().left,
-                    top: input.offset().top,
-                    width: input.outerWidth(includeMargins),
-                    height: input.outerHeight(includeMargins)
-                };
-            }
-            return {
-                left: input.left || (input.right - input.width),
-                top: input.top || (input.bottom - input.height),
-                width: input.width || (input.right - input.left),
-                height: input.height || (input.bottom - input.top),
-                bottom: (input.top + input.height) || input.bottom,
-                right: (input.left + input.width) || input.right
-            };
-        },
-        closestNum: function (target) {
-            // target, [numbers, ...]. returns the number closest to target.
-            var nums = {},
-                diff = Infinity,
-                diffs = [],
-                i;
-            for (i = 1; i < arguments.length; i++) {
-                diff = Math.abs(target - arguments[i]);
-                diffs.push(diff);
-                nums[diff] = arguments[i];
-            }
-            return nums[Math.min.apply(this, diffs)];
-        },
-        throttle: function (func, wait, options) {
-            // mod of _.throttle
-            //github.com/jashkenas/underscore/blob/1.5.1/underscore.js#L648
-            options = options || {};
-
-            var context, args, result,
-                timeout = null,
-                previous = 0,
-                later = function () {
-                    previous = options.leading === false ? 0 : new Date();
-                    timeout = null;
-                    result = func.apply(context, args);
-                };
-            return function () {
-                var now = new Date(),
-                    remaining;
-                if (!previous && options.leading === false) previous = now;
-                remaining = wait - (now - previous);
-                context = this;
-                args = arguments;
-                if (remaining <= 0) {
-                    clearTimeout(timeout);
-                    timeout = null;
-                    previous = now;
-                    result = func.apply(context, args);
-                } else if (!timeout && options.trailing !== false) {
-                    timeout = setTimeout(later, remaining);
-                }
-                return result;
+        if (input.jquery) {  // this is $(element)
+            input = {
+                left: input.offset().left,
+                top: input.offset().top,
+                width: input.outerWidth(includeMargins),
+                height: input.outerHeight(includeMargins)
             };
         }
-    };
-
-    function initSettings($host, newSettings, prefix) {
-        // if you give in newSettings, newSettings becomes the new settings.
-        // returns settings, old or new.
-        prefix = prefix || 'binpack';
-        if (newSettings) {  // set
-            $host.data(prefix + '-settings', newSettings);
-        } else {  // get
-            var _settings = $host.data(prefix + '-settings');
-            if (!_settings) {
-                // save settings for other calling methods
-                _settings = $.extend({}, defaults, newSettings);
-                $host.data(prefix + '-settings', _settings);
-            }
-            newSettings = _settings;
-        }
-        return newSettings;
+        return {
+            left: input.left || (input.right - input.width),
+            top: input.top || (input.bottom - input.height),
+            width: input.width || (input.right - input.left),
+            height: input.height || (input.bottom - input.top),
+            bottom: (input.top + input.height) || input.bottom,
+            right: (input.left + input.width) || input.right
+        };
     }
-
-    function layoutContents($host, settings) {
-        // guess what this does
-
-        settings = initSettings($host);
-
-        var $blocks = $(settings.target, $host),  // blocks
-            numColumns = settings.columns,
-            hostCoords = utils.getCoords($host),
-            columnBottoms = {},
-            maxColumnBottom = 0,
-            columnIndex = 0;
-
-        if (!numColumns) {
-            // auto-calculate number of columns based on
-            // the width of the first block
-            numColumns = parseInt($host.innerWidth() / $blocks.eq(0).outerWidth(true), 10);
+    
+    function closestNum(target) {
+        // target, [numbers, ...]. returns the number closest to target.
+        var nums = {},
+            diff = Infinity,
+            diffs = [],
+            i;
+        for (i = 1; i < arguments.length; i++) {
+            diff = Math.abs(target - arguments[i]);
+            diffs.push(diff);
+            nums[diff] = arguments[i];
         }
+        return nums[Math.min.apply(this, diffs)];
+    }
+    
+    function throttle(func, wait, options) {
+        // mod of _.throttle
+        //github.com/jashkenas/underscore/blob/1.5.1/underscore.js#L648
+        options = options || {};
 
-        // this is necessary
-        $host.css('position', 'relative');
-
-        $blocks.each(function (idx, block) {
-            var $block = $(block),
-                blockCoords = utils.getCoords($block, true),
-                newStyles = {};
-
-            newStyles.left = hostCoords.width / numColumns * columnIndex;
-            newStyles.top = (columnBottoms[columnIndex] || 0);
-
-            // TODO: isolate if needed
-            (function animateBlock($block, newStyles, settings) {
-                $block
-                    .css({position: 'absolute'})
-                    .stop()  // keep moving elements in place
-                    .animate(
-                        newStyles,
-                        settings.animationDuration,
-                        settings.easing
-                    );
-            }($block, newStyles, settings));
-
-            if (columnBottoms[columnIndex] !== undefined) {
-                // you can add anything to undefined and it becomes NaN
-                columnBottoms[columnIndex] += blockCoords.height || 0;
-            } else {
-                columnBottoms[columnIndex] = blockCoords.height || 0;
+        var context, args, result,
+            timeout = null,
+            previous = 0,
+            later = function () {
+                previous = options.leading === false ? 0 : new Date();
+                timeout = null;
+                result = func.apply(context, args);
+            };
+        return function () {
+            var now = new Date(),
+                remaining;
+            if (!previous && options.leading === false) previous = now;
+            remaining = wait - (now - previous);
+            context = this;
+            args = arguments;
+            if (remaining <= 0) {
+                clearTimeout(timeout);
+                timeout = null;
+                previous = now;
+                result = func.apply(context, args);
+            } else if (!timeout && options.trailing !== false) {
+                timeout = setTimeout(later, remaining);
             }
-
-            if (columnBottoms[columnIndex] > maxColumnBottom) {
-                // tallying the play-date height of the container
-                maxColumnBottom = columnBottoms[columnIndex];
-            }
-
-            // advance or return the column index
-            // (++a returns a + 1)
-            columnIndex = (++columnIndex) % numColumns;
-        });
-
-        // pretend the container is actually containing the absolute stuff
-        $host.height(maxColumnBottom);
+            return result;
+        };
     }
 
     // TODO: isolate if needed
@@ -229,9 +149,138 @@
         // (add target class to each element)
         var $host = this, settings;
 
-        settings = initSettings($host, params);
+        function initSettings(newSettings, prefix) {
+            // if you give in newSettings, newSettings becomes the new settings.
+            // returns settings, old or new.
+            prefix = prefix || 'binpack';
+            if (newSettings) {  // set
+                $host.data(prefix + '-settings', newSettings);
+            } else {  // get
+                var _settings = $host.data(prefix + '-settings');
+                if (!_settings) {
+                    // save settings for other calling methods
+                    _settings = $.extend({}, defaults, newSettings);
+                    $host.data(prefix + '-settings', _settings);
+                }
+                newSettings = _settings;
+            }
+            return newSettings;
+        }
 
-        function collectCoords($host) {
+        function layoutContentsByFixedColumns() {
+            // guess what this does
+
+            var $blocks = $(settings.target, $host),  // blocks
+                numColumns = settings.columns,
+                hostCoords = getCoords($host),
+                columnBottoms = {},
+                maxColumnBottom = 0,
+                columnIndex = 0;
+
+            if (!numColumns) {
+                // auto-calculate number of columns based on
+                // the width of the first block
+                numColumns = parseInt($host.innerWidth() / $blocks.eq(0).outerWidth(true), 10);
+            }
+
+            // this is necessary
+            $host.css('position', 'relative');
+
+            $blocks.each(function (idx, block) {
+                var $block = $(block),
+                    blockCoords = getCoords($block, true),
+                    newStyles = {};
+
+                newStyles.left = hostCoords.width / numColumns * columnIndex;
+                newStyles.top = (columnBottoms[columnIndex] || 0);
+
+                // TODO: isolate if needed
+                (function animateBlock($block, newStyles, settings) {
+                    $block
+                        .css({position: 'absolute'})
+                        .stop()  // keep moving elements in place
+                        .animate(
+                            newStyles,
+                            settings.animationDuration,
+                            settings.easing
+                        );
+                }($block, newStyles, settings));
+
+                if (columnBottoms[columnIndex] !== undefined) {
+                    // you can add anything to undefined and it becomes NaN
+                    columnBottoms[columnIndex] += blockCoords.height || 0;
+                } else {
+                    columnBottoms[columnIndex] = blockCoords.height || 0;
+                }
+
+                if (columnBottoms[columnIndex] > maxColumnBottom) {
+                    // tallying the play-date height of the container
+                    maxColumnBottom = columnBottoms[columnIndex];
+                }
+
+                // advance or return the column index
+                // (++a returns a + 1)
+                columnIndex = (++columnIndex) % numColumns;
+            });
+
+            // pretend the container is actually containing the absolute stuff
+            $host.height(maxColumnBottom);
+        }
+
+        function layoutContents() {
+            // guess what this does
+
+            var $blocks = $(settings.target, $host),  // blocks
+                hostCoords = getCoords($host),
+                columnBottoms = {},
+                maxColumnBottom = 0,
+                columnIndex = 0;
+
+            // this is necessary
+            $host.css('position', 'relative');
+
+            $blocks.each(function (idx, block) {
+                var $block = $(block),
+                    blockCoords = getCoords($block, true),
+                    newStyles = {};
+
+                newStyles.left = hostCoords.width / numColumns * columnIndex;
+                newStyles.top = (columnBottoms[columnIndex] || 0);
+
+                // TODO: isolate if needed
+                (function animateBlock($block, newStyles, settings) {
+                    $block
+                        .css({position: 'absolute'})
+                        .stop()  // keep moving elements in place
+                        .animate(
+                            newStyles,
+                            settings.animationDuration,
+                            settings.easing
+                        );
+                }($block, newStyles, settings));
+
+                if (columnBottoms[columnIndex] !== undefined) {
+                    // you can add anything to undefined and it becomes NaN
+                    columnBottoms[columnIndex] += blockCoords.height || 0;
+                } else {
+                    columnBottoms[columnIndex] = blockCoords.height || 0;
+                }
+
+                if (columnBottoms[columnIndex] > maxColumnBottom) {
+                    // tallying the play-date height of the container
+                    maxColumnBottom = columnBottoms[columnIndex];
+                }
+
+                // advance or return the column index
+                // (++a returns a + 1)
+                columnIndex = (++columnIndex) % numColumns;
+            });
+
+            // pretend the container is actually containing the absolute stuff
+            $host.height(maxColumnBottom);
+        }
+
+        function collectCoords() {
             // get list of (coords of each content).
             // you should only trust their width/height values.
             var $blocks = $(settings.target, $host),
@@ -239,29 +288,26 @@
 
             $.each($blocks, function (idx, obj) {
                 var $obj = $(obj),
-                    coords = utils.getCoords();
+                    coords = getCoords();
                 coords.element = $obj;  // keep it
                 lstVectors.push(coords);
             });
             return lstVectors;
         }
 
-        layoutContents($host, settings);
+        settings = initSettings(params);
+        layoutContents();
 
         // TODO: isolate if needed
         (function attachEvents() {
             // events go here
             if (settings.bindResize) {
-                var throttledResize = utils.throttle(function () {
+                var throttledResize = throttle(function () {
                     $host.each(function (i, o) {
                         layoutContents($(o));
                     });
                 }, settings.resizeFrequency);
                 $(window).resize(throttledResize);
-            }
-
-            if (settings.debug) {
-                window.utils = utils;
             }
         }());
 
@@ -283,9 +329,7 @@
         }
 
         setup();
-        layoutContents($host, undefined);
-
-        return $host.each($.noop);
+        return objInit.apply($host);
     }
 
     $.fn.binpack = function (params) {
@@ -307,7 +351,9 @@
 
     (function (mediator) {
         // hooks
-        mediator.on('resize', layoutContents);
+        if (mediator) {
+            mediator.on('layoutContents', layoutContents);
+        }
     }(window.Willet && window.Willet.mediator));
 
 }(jQuery));

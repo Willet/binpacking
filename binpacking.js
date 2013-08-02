@@ -106,6 +106,15 @@
         }
     }
 
+    function sum() {
+        // really, JS?
+        // mod of www.codingforums.com/showthread.php?t=218803
+        var args = Array.prototype.slice.call(arguments, 0);
+        return args.reduce(function (a, b) {
+            return a + b;
+        });
+    }
+
     function closestNum(target) {
         // target, [numbers, ...]. returns the number closest to target.
         var nums = {},
@@ -253,15 +262,58 @@
         return Math.floor(this.$container.innerWidth() / this.getColumnWidth());
     };
 
-    BinPack.prototype.initColumns = function (columnCount) {
+    BinPack.prototype.getColumns = function () {
+        return this.initColumns(this.getNumColumns());
+    };
+
+    BinPack.prototype.getShortestColumn = function () {
+        var columns = this.getColumns(),
+            shortestColumn = 0,
+            shortestColumnHeight = Infinity;
+
+        $.map(columns, function (val, key) {
+            if (val.height < shortestColumnHeight) {
+                shortestColumn = key;
+                shortestColumnHeight = val.height;
+            }
+        });
+
+        return columns[shortestColumn];
+    };
+
+    BinPack.prototype.getTallestColumn = function () {
+        var columns = this.getColumns(),
+            tallestColumn = 0,
+            tallestColumnHeight = 0;
+
+        $.map(columns, function (val, key) {
+            if (val.height > tallestColumnHeight) {
+                tallestColumn = key;
+                tallestColumnHeight = val.height;
+            }
+        });
+
+        return columns[tallestColumn];
+    };
+
+    BinPack.prototype.initColumns = function (columnCount, force) {
+        // this runs only once.
+        if (this.columns && this.columns[0]) {
+            // properly initialised columns should have column #0.
+            if (!force) {
+                return this.columns;
+            }
+        }
         this.columns = {};
         for (var i = 0; i < columnCount; i++) {
             this.columns[i] = {
+                'index': i,
                 'contents': [],
                 'width': this.settings.columnWidth,
                 'height': 0
             };
         }
+        return this.columns;
     };
 
     BinPack.prototype.addBinToColumn = function (columnId, $bin) {
@@ -277,24 +329,25 @@
         } catch (err) {
             this.columns[columnId].contents = [$bin];
         }
+        var blockWidths = $(this.columns.contents).map(function (i, o) {
+            return $(o).outerWidth(true);
+        });
         var blockHeights = $(this.columns.contents).map(function (i, o) {
             return $(o).outerHeight(true);
         });
         this.columns[columnId].width = Math.max.apply(null, blockHeights);
+        this.columns[columnId].height = sum(blockHeights);
 
-        return this.columns;
-    };
-
-    BinPack.prototype.getColumns = function () {
         return this.columns;
     };
 
     BinPack.prototype.transitBlock = function ($bin, x, y) {
         // move with css
-        if ($.support.transition) {
+        if ($.support.transition) {  //api.jquery.com/jQuery.support/
             $bin.css({
                 left: x,
                 top: y,
+                // http://matthewlein.com/ceaser/
                 'transition': 'all ' + this.settings.animationDuration +
                     'ms cubic-bezier(0.230, 1.000, 0.320, 1.000)',
                 'transition-timing-function': 'cubic-bezier(0.165, 0.840, 0.440, 1.000)'
@@ -314,51 +367,30 @@
             settings = instance.settings,
             $blocks = $(settings.target, $container),  // blocks
             numColumns = instance.getNumColumns(),
-            hostCoords = getCoords($container),
-            columnBottoms = {},
-            maxColumnBottom = 0,
-            columnIndex = 0;
-
-        instance.initColumns();
+            // columns = instance.initColumns(numColumns, true),
+            hostCoords = getCoords($container);
 
         // this is necessary
         $container.css('position', 'relative');
 
         $blocks.each(function (idx, block) {
             var $block = $(block),
-                blockCoords = getCoords($block, true),
-                newStyles = {};
+                newStyles = {},
+                shortestColumn = instance.getShortestColumn();
 
-            newStyles.left = hostCoords.width / numColumns * columnIndex;
-            newStyles.top = (columnBottoms[columnIndex] || 0);
+            newStyles.left = hostCoords.width / numColumns * shortestColumn.index;
+            newStyles.top = shortestColumn.height;
 
             $block.css({position: 'absolute'}).stop();                         // keep moving elements in place
-            /*
-            $block.animate(newStyles,
-                           settings.animationDuration,
-                           settings.easing);
-            */
+
             instance.transitBlock($block, newStyles.left, newStyles.top);
 
-            if (columnBottoms[columnIndex] !== undefined) {
-                // you can add anything to undefined and it becomes NaN
-                columnBottoms[columnIndex] += blockCoords.height || 0;
-            } else {
-                columnBottoms[columnIndex] = blockCoords.height || 0;
-            }
-
-            if (columnBottoms[columnIndex] > maxColumnBottom) {
-                // tallying the play-date height of the container
-                maxColumnBottom = columnBottoms[columnIndex];
-            }
-
-            // advance or return the column index
-            // (++a returns a + 1)
-            columnIndex = (++columnIndex) % numColumns;
+            // recalculate width/height
+            instance.addBinToColumn(shortestColumn.index, $block);
         });
 
         // pretend the container is actually containing the absolute stuff
-        $container.height(maxColumnBottom);
+        $container.height(instance.getTallestColumn().height);
     };
 
     // add the animation

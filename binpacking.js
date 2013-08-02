@@ -237,7 +237,9 @@
         return objInit.apply($host);
     }
 
+
     // ========================================================================
+
 
     function BinPack(settings) {
         // definition of a BinPack "job"
@@ -329,14 +331,14 @@
         } catch (err) {
             this.columns[columnId].contents = [$bin];
         }
-        var blockWidths = $(this.columns.contents).map(function (i, o) {
+        var blockWidths = $(this.columns[columnId].contents).map(function (i, o) {
             return $(o).outerWidth(true);
         });
-        var blockHeights = $(this.columns.contents).map(function (i, o) {
+        var blockHeights = $(this.columns[columnId].contents).map(function (i, o) {
             return $(o).outerHeight(true);
         });
         this.columns[columnId].width = Math.max.apply(null, blockHeights);
-        this.columns[columnId].height = sum(blockHeights);
+        this.columns[columnId].height = sum.apply(null, blockHeights);
 
         return this.columns;
     };
@@ -367,7 +369,6 @@
             settings = instance.settings,
             $blocks = $(settings.target, $container),  // blocks
             numColumns = instance.getNumColumns(),
-            // columns = instance.initColumns(numColumns, true),
             hostCoords = getCoords($container);
 
         // this is necessary
@@ -391,7 +392,14 @@
 
         // pretend the container is actually containing the absolute stuff
         $container.height(instance.getTallestColumn().height);
+
+        // reset geometry data so resizing works
+        instance.initColumns(numColumns, true);
     };
+
+
+    // ========================================================================
+
 
     // add the animation
     if (!$.easing.easeOutQuint) {

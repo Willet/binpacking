@@ -3,61 +3,23 @@
 
         Configuration options: see 'settings' variable.                        // further reading:
                                                                                // http://jmlr.org/papers/volume11/gyorgy10a/gyorgy10a.pdf
-        re-licensing restrictions:                                             // http://i11www.iti.uni-karlsruhe.de/_media/teaching/sommer2010/approximationsonlinealgorithmen/onl-bp.pdf
-        * underscore.js (or its portions) is licensed under MIT.
-          (c) 2009-2013 Jeremy Ashkenas, DocumentCloud and
-          Investigative Reporters & Editors
-        * jquery.easing.1.3.js is licensed under BSD.
-          Copyright © 2008 George McGinley Smith
-
+                                                                               // http://i11www.iti.uni-karlsruhe.de/_media/teaching/sommer2010/approximationsonlinealgorithmen/onl-bp.pdf
         Willet Inc. claims copyright to all remaining portions of this code,
-        licensing them under hybrid BSD and MIT licenses:
-
-        Permission is hereby granted, free of charge, to any person obtaining
-        a copy of this software and associated documentation files (the
-        "Software"), to deal in the Software without restriction, including
-        without limitation the rights to use, copy, modify, merge, publish,
-        distribute, sublicense, and/or sell copies of the Software, and to
-        permit persons to whom the Software is furnished to do so, subject to
-        the following conditions:
-
-        - The above copyright notice and this permission notice shall be
-        included in all copies or substantial portions of the Software.
-
-        - Redistributions of source code must retain the above copyright notice,
-        this list of conditions and the following disclaimer.
-        - Redistributions in binary form must reproduce the above copyright
-        notice, this list of conditions and the following disclaimer in the
-        documentation and/or other materials provided with the distribution.
-
-        - Neither the name of the author nor the names of contributors may be
-        used to endorse or promote products derived from this software without
-        specific prior written permission.
-
-        THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-        "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-        LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-        A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-        OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-        SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-        LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-        DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-        THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-        (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-        OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+        licensing them under hybrid BSD and MIT licenses.
      */
     "use strict";
 
     var defaults = {
         after: undefined, // for locating the element after which thigns are appended
+        bindResize: undefined,
         debug: false,
         target: '.bin',
         easing: 'easeOutQuint',
         columnWidth: 0,
         objects: [],  // for things like 'append'
         animationDuration: 600,
-        resizeFrequency: 600
-    };
+        resizeFrequency: 1000
+    }, $window = $(window);
 
     function getCoords(input, includeMargins) {
         // @param input: either a left/right/top/bottom/... object,
@@ -87,18 +49,22 @@
 
     function each(obj, iterator, context) {
         // mod of _.each
-        //github.com/jashkenas/underscore/blob/1.5.1/underscore.js#L76
+        // github.com/jashkenas/underscore/blob/1.5.1/underscore.js#L76
+        // underscore.js (or its portions) is licensed under MIT.
+        // (c) 2009-2013 Jeremy Ashkenas, DocumentCloud and
+        // Investigative Reporters & Editors
+        var i, l, objKey;
         if (obj === null) {
             return;
         }
         if (obj.forEach) {
             obj.forEach(iterator, context);
         } else if (obj.length === +obj.length) {
-            for (var i = 0, l = obj.length; i < l; i++) {
+            for (i = 0, l = obj.length; i < l; i++) {
                 iterator.call(context, obj[i], i, obj);
             }
         } else {
-            for (var objKey in obj) {
+            for (objKey in obj) {
                 if (obj.hasOwnProperty(objKey)) {
                     iterator.call(context, obj[objKey], objKey, obj);
                 }
@@ -126,7 +92,7 @@
             diffs.push(diff);
             nums[diff] = arguments[i];
         }
-        return nums[Math.min.apply(this, diffs)];
+        return nums[Math.min.apply(null, diffs)];
     }
 
     function throttle(func, wait, options) {
@@ -186,14 +152,17 @@
             // if you give in newSettings, newSettings becomes the new settings.
             // returns settings, old or new.
             prefix = prefix || 'binpack';
+            var settingsKey = prefix + 'Settings',
+                _settings = $.extend({}, defaults, newSettings);
+
             if (newSettings) {  // set
-                $hosts.data(prefix + '-settings', newSettings);
+                $hosts.data(settingsKey, _settings);
             } else {  // get
-                var _settings = $hosts.data(prefix + '-settings');
+                _settings = $hosts.data(settingsKey);
                 if (!_settings) {
                     // save settings for other calling methods
                     _settings = $.extend({}, defaults, newSettings);
-                    $hosts.data(prefix + '-settings', _settings);
+                    $hosts.data(settingsKey, _settings);
                 }
                 newSettings = _settings;
             }
@@ -201,19 +170,24 @@
         }
 
         return $hosts.each(function (i, host) {  // chaining
-            var $host = $(host);
+            var $host = $(host), _resize;
             settings = initSettings(params);
             binPacker = new BinPack(settings);
             binPacker.$container = $host;
             binPacker.layout();
 
+            // events go here
             // TODO: isolate if needed
             (function attachEvents() {
-                // events go here
-                if (settings.bindResize) {
-                    $(window).resize(throttle(function () {
+                _resize = throttle(function () {
+                    if ($window.width() !== $window.data('binpack-width')) {
                         relayoutInstance($host);
-                    }, settings.resizeFrequency));
+                        $window.data('binpack-width', $window.width());
+                    }
+                }, settings.resizeFrequency);
+
+                if (settings.bindResize === true) {
+                    $window.resize(_resize);
                 }
             }());
 
@@ -255,7 +229,10 @@
         } else {
             // if column width is not specified, use the width of the first item
             var firstItem = $(this.settings.target, this.$container).eq(0);
-            return firstItem.outerWidth(true);
+
+            // not sure if modify...
+            this.settings.columnWidth = firstItem.outerWidth(true);
+            return this.settings.columnWidth;
         }
     };
 
@@ -337,13 +314,13 @@
         var blockHeights = $(this.columns[columnId].contents).map(function (i, o) {
             return $(o).outerHeight(true);
         });
-        this.columns[columnId].width = Math.max.apply(null, blockHeights);
+        this.columns[columnId].width = Math.max.apply(null, blockWidths);
         this.columns[columnId].height = sum.apply(null, blockHeights);
 
         return this.columns;
     };
 
-    BinPack.prototype.transitBlock = function ($bin, x, y) {
+    BinPack.prototype.moveBlock = function ($bin, x, y) {
         // move with css
         if ($.support.transition) {  //api.jquery.com/jQuery.support/
             $bin.css({
@@ -358,7 +335,7 @@
             $bin.animate({
                 left: x,
                 top: y
-            }, settings.animationDuration, $settings.easing);
+            }, this.settings.animationDuration, this.settings.easing);
         }
     };
 
@@ -369,7 +346,8 @@
             settings = instance.settings,
             $blocks = $(settings.target, $container),  // blocks
             numColumns = instance.getNumColumns(),
-            hostCoords = getCoords($container);
+            hostCoords = getCoords($container),
+            centeringOffset = (hostCoords.width - numColumns * instance.getColumnWidth()) / 2;
 
         // this is necessary
         $container.css('position', 'relative');
@@ -379,12 +357,16 @@
                 newStyles = {},
                 shortestColumn = instance.getShortestColumn();
 
-            newStyles.left = hostCoords.width / numColumns * shortestColumn.index;
+            newStyles.left = centeringOffset +
+                (shortestColumn.width ||
+                 settings.columnWidth ||
+                 (hostCoords.width - centeringOffset * 2) / settings.columns)
+                    * shortestColumn.index;
             newStyles.top = shortestColumn.height;
 
             $block.css({position: 'absolute'}).stop();                         // keep moving elements in place
 
-            instance.transitBlock($block, newStyles.left, newStyles.top);
+            instance.moveBlock($block, newStyles.left, newStyles.top);
 
             // recalculate width/height
             instance.addBinToColumn(shortestColumn.index, $block);
@@ -406,6 +388,8 @@
         $.easing.easeOutQuint = function (x, t, b, c, d) {
             // jquery.easing.easeOutQuint
             // gsgd.co.uk/sandbox/jquery/easing/jquery.easing.1.3.js
+            // jquery.easing.1.3.js is licensed under BSD.
+            // Copyright © 2008 George McGinley Smith
             return c * ((t = t / d - 1) * t * t * t * t + 1) + b;
         };
     }

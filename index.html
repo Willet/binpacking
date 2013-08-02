@@ -8,20 +8,35 @@
     <script type="text/javascript">
         $(document).ready(function () {
             "use strict";
-            $('.bin', '#container').each(function (i, o) {
-                $(o).css({
-                    /* 'width': 300 * (1 + Math.round(Math.random())), */
-                    'height': 100 + Math.random() * 300
-                });
+
+            var binCount = $('.bin').length;
+
+            function addBin() {
+                $('#container').binpack([
+                    $('<div />', {
+                        'class': 'bin',
+                        'html': ++binCount,
+                        'css': {
+                            // 'width': 300 * (1 + Math.round(Math.random())),
+                            'height': 100 + Math.random() * 300
+                        }
+                    })
+                ]);
+            }
+
+            while (binCount < 20) {
+                addBin();
+            }
+
+            $('#container').binpack({
+                'target': '.bin',
+                'bindResize': true,
+                'animationDuration': 600
             });
 
-            $('#container')
-                .binpack({
-                    'target': '.bin',
-                    'bindResize': true,
-                    'animationDuration': 600
-                })
-                .binpack([$('<div />', {'class': 'bin', 'html': '21'})]);
+            $(document).on('click', '.bin', addBin);
+
+            $(window).scroll(addBin);
         });
     </script>
     <style type="text/css">
@@ -47,26 +62,6 @@
 </head>
 <body>
     <div id="container">
-        <div class="bin">1</div>
-        <div class="bin">2</div>
-        <div class="bin">3</div>
-        <div class="bin">4</div>
-        <div class="bin">5</div>
-        <div class="bin">6</div>
-        <div class="bin">7</div>
-        <div class="bin">8</div>
-        <div class="bin">9</div>
-        <div class="bin">10</div>
-        <div class="bin">11</div>
-        <div class="bin">12</div>
-        <div class="bin">13</div>
-        <div class="bin">14</div>
-        <div class="bin">15</div>
-        <div class="bin">16</div>
-        <div class="bin">17</div>
-        <div class="bin">18</div>
-        <div class="bin">19</div>
-        <div class="bin">20</div>
     </div>
 </body>
 </html>
